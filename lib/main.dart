@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_ml/ml.dart';
-import 'package:google_ml/screens/menu.dart';
+import 'package:google_ml/screens/event_list.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,39 +25,6 @@ class MyApp extends StatelessWidget {
           // is not restarted.
           primarySwatch: Colors.blue,
         ),
-        home: Menu());
-  }
-}
-
-class Home extends StatelessWidget {
-  const Home({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-          title: Text('ML Kit Text Recognition'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Text(
-                'ML Kit Text Recognition',
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            // Navigator push to MyWidget()
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => MyWidget()),
-            );
-          },
-          child: const Icon(Icons.add),
-          backgroundColor: Colors.blue,
-        ));
+        home: EventListWidget());
   }
 }
