@@ -17,6 +17,7 @@ import 'dart:io';
 import 'package:pdfx/pdfx.dart';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MLScreen extends StatefulWidget {
   final VoidCallback callBack;
@@ -46,12 +47,12 @@ class _MLScreenState extends State<MLScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Choose image source'),
+          title: Text('Wähle die Quelle deines Tickets'),
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
                 GestureDetector(
-                  child: Text('Gallery'),
+                  child: Text('Gallerie'),
                   onTap: () async {
                     Navigator.pop(context);
                     await _pickAndCropImageFromSource(ImageSource.gallery);
@@ -59,7 +60,15 @@ class _MLScreenState extends State<MLScreen> {
                 ),
                 Padding(padding: EdgeInsets.all(8.0)),
                 GestureDetector(
-                  child: Text('Local file system'),
+                  child: Text('Kamera'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _pickAndCropImageFromSource(ImageSource.camera);
+                  },
+                ),
+                Padding(padding: EdgeInsets.all(8.0)),
+                GestureDetector(
+                  child: Text('Dateisystem'),
                   onTap: () async {
                     Navigator.pop(context);
                     await _pickAndCropImageFromFileSystem();
@@ -75,8 +84,7 @@ class _MLScreenState extends State<MLScreen> {
 
   Future<void> _pickAndCropImageFromSource(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.getImage(source: source);
-    print(pickedFile);
+    final pickedFile = await picker.pickImage(source: source);
     if (pickedFile != null) {
       _proceedTicket(pickedFile);
     }
@@ -94,34 +102,21 @@ class _MLScreenState extends State<MLScreen> {
       _selectedFile = File(result.files.single.path!);
       final bytes = await _selectedFile!.readAsBytes();
       _document = await PdfDocument.openData(bytes);
-      final page = await _document.getPage(1);
-      final pageImage = await page.render(
-        // rendered image width resolution, required
-        width: page.width * 2,
-        // rendered image height resolution, required
-        height: page.height * 2,
-
-        // Rendered image compression format, also can be PNG, WEBP*
-        // Optional, default: PdfPageImageFormat.PNG
-        // Web not supported
-        format: PdfPageImageFormat.jpeg,
-
-        // Image background fill color for JPEG
-        // Optional, default '#ffffff'
-        // Web not supported
-        backgroundColor: '#ffffff',
-
-        // Crop rect in image for render
-        // Optional, default null
-        // Web not supported
-      );
-      print(pageImage);
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/page_1.jpg');
-      final imageBytes = await pageImage!.bytes;
-      await file.writeAsBytes(imageBytes);
-      print('Rendered image saved to: ${file.path}');
-      _proceedTicket(file);
+      var count = (_document.pagesCount);
+      for (var i = 1; i <= count; i++) {
+        final page = await _document.getPage(i);
+        final pageImage = await page.render(
+          width: page.width * 2,
+          height: page.height * 2,
+          format: PdfPageImageFormat.jpeg,
+          backgroundColor: '#ffffff',
+        );
+        final directory = await getTemporaryDirectory();
+        final file = File('${directory.path}/page_$i.jpg');
+        final imageBytes = await pageImage!.bytes;
+        await file.writeAsBytes(imageBytes);
+        await _proceedTicket(file);
+      }
     }
   }
 
@@ -132,14 +127,17 @@ class _MLScreenState extends State<MLScreen> {
       address = await getAddress(_recognizedText);
       await getCode();
       date = await getDate(_recognizedText);
-      DateTime dateTime;
-      print(date);
+      DateTime? dateTime;
+
       try {
-        DateFormat format = DateFormat('MM/dd/yyyy hh:mm');
-        dateTime = format.parse(date!);
-        print(dateTime);
-        dateTime = date != null ? DateTime.parse(date!) : DateTime.now();
-        print(dateTime);
+        dateTime = DateTime.tryParse(date!);
+        if (dateTime == null) {
+          // Parsing failed
+          print('Invalid date format');
+        } else {
+          // Parsing successful
+          print('DateTime: $dateTime');
+        }
       } catch (e) {
         dateTime = DateTime.now();
         print(e);
@@ -173,9 +171,8 @@ class _MLScreenState extends State<MLScreen> {
         });
         final appDir = await getApplicationDocumentsDirectory();
 
-        final event = Event.create(
-            title ?? '', dateTime.toIso8601String(), address ?? 'New Place');
-        print(event.id);
+        final event = Event.create(title ?? '', date ?? '', address ?? '');
+
         final savedFile =
             await File(croppedFile.path).copy('${appDir.path}/${event.id}.jpg');
         print(savedFile.path);
@@ -207,24 +204,45 @@ class _MLScreenState extends State<MLScreen> {
     var blocks = [];
     var index = 0;
     var sum = 0.0;
-    print(recognizedText.text);
+
     title = recognizedText.blocks.first.text;
     recognizedText.blocks.forEach((element) {
-      blocks.add({
-        'text': element.text,
-        'size': element.boundingBox.height,
-        'index': index
+      var heighest = 0.0;
+      element.lines.forEach((line) {
+        line.elements.forEach((element) {
+          if (element.boundingBox.height > heighest) {
+            heighest = element.boundingBox.height;
+          }
+        });
       });
-      sum += element.boundingBox.height;
+      blocks.add({'text': element.text, 'size': heighest, 'index': index});
+      sum += heighest;
       index++;
     });
 
     //blocks order by size
     blocks.sort((a, b) => b['size'].compareTo(a['size']));
 
-    //sum up all height
+    var indexSize = 0;
 
-    print(sum / index);
+    blocks.forEach((element) {
+      print(element['text']);
+      print(element['size']);
+      element['positionAndSize'] = indexSize + blocks[indexSize]['index'];
+      indexSize++;
+    });
+
+    blocks.sort((a, b) => a['positionAndSize'].compareTo(b['positionAndSize']));
+
+    blocks.forEach((element) {
+      print(element['text']);
+      print(element['positionAndSize']);
+    });
+
+    // blocks.sort((a, b) => a['positionAndSize'].compareTo(b['positionAndSize']));
+
+    print(blocks.first['text']);
+    title = blocks.first['text'];
 
     _recognizedText = recognizedText.text;
   }
@@ -236,18 +254,16 @@ class _MLScreenState extends State<MLScreen> {
 
     final inputImage = InputImage.fromFile(_image!);
     final ImageLabelerOptions options =
-        ImageLabelerOptions(confidenceThreshold: 0.5);
+        ImageLabelerOptions(confidenceThreshold: 0.4);
     final imageLabeler = ImageLabeler(options: options);
 
     final List<BarcodeFormat> formats = [BarcodeFormat.all].toList();
     final barcodeScanner = BarcodeScanner(formats: formats);
     final List<Barcode> barcodes =
         await barcodeScanner.processImage(inputImage);
-    print(barcodes.length);
 
     if (barcodes.isNotEmpty) rect = (barcodes[0].boundingBox);
 
-    print(rect);
     barcodeScanner.close();
   }
 
@@ -269,10 +285,7 @@ class _MLScreenState extends State<MLScreen> {
     }
 
     annotations.forEach((annotation) {
-      annotation.entities.forEach((entity) {
-        //print(entity.type);
-        print(entity.type == EntityType.address);
-      });
+      annotation.entities.forEach((entity) {});
     });
     setState(() {
       address;
@@ -289,10 +302,14 @@ class _MLScreenState extends State<MLScreen> {
         await entityExtractor.annotateText(inputText);
 
     try {
-      date = annotations
-          .firstWhere((element) => element.entities
+      date = '';
+      annotations
+          .where((element) => element.entities
               .any((entity) => entity.type == EntityType.dateTime))
-          .text;
+          .forEach((element) {
+        date = date! + ' ' + element.text;
+      });
+
       return date;
     } catch (e) {
       print('koi Datum');

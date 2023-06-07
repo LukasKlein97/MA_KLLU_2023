@@ -39,6 +39,16 @@ class _EventListWidgetState extends State<EventListWidget> {
     await prefs.clear();
   }
 
+  Future<void> _deleteAll(Event event) async {
+    setState(() {
+      _events.remove(event);
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final eventsJson = _events.map((event) => jsonEncode(event)).toList();
+    await prefs.setStringList('events', []);
+  }
+
   Future<void> _deleteEvent(Event event) async {
     setState(() {
       _events.remove(event);
@@ -79,8 +89,7 @@ class _EventListWidgetState extends State<EventListWidget> {
                   child: ListTile(
                     onTap: () => _navigateToEditEventScreen(event),
                     title: Text(event.title),
-                    trailing: Text(
-                        '${formatter.format(DateTime.parse(event.date))} '),
+                    trailing: Text(event.date),
                     subtitle: Text('${event.place}'),
                   ),
                   background: Container(
@@ -93,7 +102,7 @@ class _EventListWidgetState extends State<EventListWidget> {
               },
             ),
           ),
-          /* ElevatedButton(
+          /*ElevatedButton(
             onPressed: _clearSharedPreferences,
             child: Text('Clear Shared Preferences'),
           ),*/

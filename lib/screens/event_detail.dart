@@ -37,8 +37,7 @@ class _EventDetailsState extends State<EventDetails> {
     _place = widget.event.place;
     //appDir = await getApplicationDocumentsDirectory();
 
-    _dateController = TextEditingController(
-        text: formatter.format(DateTime.parse(widget.event.date)));
+    // _dateController = TextEditingController(text: widget.event.date);
   }
 
   Future<void> _editEvent() async {
@@ -88,7 +87,7 @@ class _EventDetailsState extends State<EventDetails> {
   Future<void> _selectDate() async {
     final DateTime? selected = await showDatePicker(
       context: context,
-      initialDate: DateTime.parse(widget.event.date),
+      initialDate: DateTime.parse(DateTime.now().toString()),
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
     );
@@ -96,9 +95,10 @@ class _EventDetailsState extends State<EventDetails> {
     if (selected != null && selected != widget.event.date) {
       setState(() {
         _selectedDate = selected;
+        print(_selectedDate);
 
-        _dateController.text = formatter.format(_selectedDate);
-        _date = _dateController.text;
+        _date = formatter.format(_selectedDate);
+        print(_date);
       });
     }
   }
@@ -114,77 +114,115 @@ class _EventDetailsState extends State<EventDetails> {
         appBar: AppBar(
           title: Text('Edit Event Details'),
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: <Widget>[
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => FullScreenImage(
-                          imagePath:
-                              '${widget.appDir.path}/${widget.event.id}.jpg',
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: <Widget>[
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FullScreenImage(
+                            imagePath:
+                                '${widget.appDir.path}/${widget.event.id}.jpg',
+                          ),
+                        ),
+                      );
+                    },
+                    child: Hero(
+                      tag: 'imageHero',
+                      child: Image.file(
+                        File('${widget.appDir.path}/${widget.event.id}.jpg'),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  TextFormField(
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () {
+                      // Handle next button action here
+                      FocusScope.of(context).nextFocus();
+                    },
+                    maxLines: 3,
+                    initialValue: _title,
+                    decoration: InputDecoration(labelText: 'Titel'),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a title';
+                      }
+                      return null;
+                    },
+                    onChanged: (value) => _title = value!,
+                  ),
+                  Stack(
+                    children: [
+                      TextFormField(
+                        onTap: () => print(_date),
+                        maxLines: 3,
+                        textInputAction: TextInputAction.next,
+                        initialValue: _date,
+                        decoration: InputDecoration(labelText: 'Datum'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a title';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) => _date = value!,
+                      ),
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: IconButton(
+                          icon: Icon(Icons.calendar_month_outlined),
+                          onPressed: () {
+                            _selectDate();
+                          },
                         ),
                       ),
-                    );
-                  },
-                  child: Hero(
-                    tag: 'imageHero',
-                    child: Image.file(
-                      File('${widget.appDir.path}/${widget.event.id}.jpg'),
-                      fit: BoxFit.cover,
-                    ),
+                    ],
                   ),
-                ),
-                TextFormField(
-                  initialValue: _title,
-                  decoration: InputDecoration(labelText: 'Title'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a title';
-                    }
-                    return null;
-                  },
-                  onChanged: (value) => _title = value!,
-                ),
-                GestureDetector(
-                  onTap: _selectDate,
-                  child: AbsorbPointer(
-                    child: TextFormField(
-                      controller: _dateController,
-                      decoration: InputDecoration(
-                        labelText: 'Date',
+
+                  /* GestureDetector(
+                    onTap: _selectDate,
+                    child: AbsorbPointer(
+                      child: TextFormField(
+                        controller: _dateController,
+                        decoration: InputDecoration(
+                          labelText: 'Date',
+                        ),
                       ),
                     ),
+                  ),*/
+                  TextFormField(
+                    maxLines: 3,
+                    initialValue: _place,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(labelText: 'Ort'),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a place';
+                      }
+                      return null;
+                    },
+                    onChanged: (value) => _place = value!,
                   ),
-                ),
-                TextFormField(
-                  maxLines: 3,
-                  initialValue: _place,
-                  decoration: InputDecoration(labelText: 'Place'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a place';
-                    }
-                    return null;
-                  },
-                  onChanged: (value) => _place = value!,
-                ),
-                SizedBox(height: 16.0),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      widget.newEvent ? _addEvent() : _editEvent();
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: Text('Save'),
-                ),
-              ],
+                  SizedBox(height: 16.0),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        widget.newEvent ? _addEvent() : _editEvent();
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Text('Speichern'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
